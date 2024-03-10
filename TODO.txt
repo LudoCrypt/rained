@@ -1,6 +1,5 @@
-Bugs:
-- loading a new level with the prop editor open will load light map data incorrectly?
-- crashes when calling UnloadMesh on Debian Linux 
+Linux Compatibility:
+- init files don't care about case-sensitivity...
 
 Overall:
 - auto-recovery saves (main problem is figuring out how to do it non-blocking)
