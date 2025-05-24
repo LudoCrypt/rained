@@ -631,7 +631,7 @@ partial class PropEditor : IEditorMode
                             a = prop.Rope!.Model!.SegmentCount;
                         }
 
-                        for (int i = 0; i < 2; i++)
+                        for (int i = 0; i < 2 + a; i++)
                         {
                             Vector2 ppoint;
 
