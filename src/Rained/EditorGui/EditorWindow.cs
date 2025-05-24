@@ -370,6 +370,7 @@ static class EditorWindow
                     var viewGfx = prefs.ViewTileGraphicPreview;
                     var viewSpecs = prefs.ViewTileSpecPreview;
                     var specsTooltip = prefs.ViewTileSpecsOnTooltip;
+                    var catalogPreview = prefs.ViewTilePreviewOnCatalog;
 
                     if (ImGui.MenuItem("Graphics", null, ref viewGfx))
                         prefs.ViewTileGraphicPreview = viewGfx;
@@ -379,6 +380,9 @@ static class EditorWindow
                     
                     if (ImGui.MenuItem("Tooltip Geometry", null, ref specsTooltip))
                         prefs.ViewTileSpecsOnTooltip = specsTooltip;
+                    
+                    if (ImGui.MenuItem("Catalog Preview", null, ref catalogPreview))
+                        prefs.ViewTilePreviewOnCatalog = catalogPreview;
                     
                     ImGui.EndMenu();
                 }
@@ -569,6 +573,13 @@ static class EditorWindow
         if (KeyShortcuts.Activated(KeyShortcut.ToggleViewGraphics))
         {
             prefs.ViewPreviews = !prefs.ViewPreviews;
+            Rendering.LevelEditRender? renderer = null;
+            if (RainEd.Instance.CurrentTab is not null) {
+                renderer = RainEd.Instance.LevelView.Renderer;
+                renderer.InvalidateGeo(0);
+                renderer.InvalidateGeo(1);
+                renderer.InvalidateGeo(2);
+            }
         }
 
         if (KeyShortcuts.Activated(KeyShortcut.ToggleViewNodeIndices))

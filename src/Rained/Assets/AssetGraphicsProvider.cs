@@ -23,6 +23,7 @@ class AssetGraphicsProvider
     }
 
     private readonly Dictionary<string, CachedTexture> tileTexCache = [];
+    private readonly Dictionary<string, CachedTexture> matTexCache = [];
     private readonly Dictionary<string, CachedTexture> propTexCache = [];
     private readonly Dictionary<string, RlManaged.Image> _loadedTilePreviews = [];
 
@@ -169,6 +170,33 @@ class AssetGraphicsProvider
         }
 
         tileTexCache.Add(assetName, texture);
+        return texture.Obtain();
+    }
+    
+    public LargeTexture? GetMaterialTexture(string assetName) {
+        if (matTexCache.TryGetValue(assetName, out CachedTexture? texture))
+            return texture.Obtain();
+
+        // find tile path
+        // for some reason, previews for drought props are in cast data instead of in the Props folder
+        // kind of annoying. so i just put those images in assets/drizzle-cast
+        string texturePath = GetFilePath(Path.Combine(RainEd.Instance.AssetDataPath, "Materials"), assetName + ".png");
+        if (!File.Exists(texturePath) && DrizzleCast.GetFileName(assetName + ".png", out string? castPath)) {
+            texturePath = castPath!;
+        }
+
+        using var srcImage = RlManaged.Image.Load(texturePath);
+
+        if (Raylib.IsImageReady(srcImage)) {
+            CropImage(srcImage);
+            texture = new CachedTexture(new LargeTexture(srcImage));
+        }
+        else {
+            Log.UserLogger.Warning($"Image {texturePath} is invalid or missing!");
+            texture = new CachedTexture(null);
+        }
+
+        matTexCache.Add(assetName, texture);
         return texture.Obtain();
     }
 
@@ -551,6 +579,19 @@ class AssetGraphicsProvider
         }
 
         foreach (var name in remove) tileTexCache.Remove(name);
+        remove.Clear();
+        
+        foreach (var (name, tex) in matTexCache)
+        {
+            if ((now - tex.LastAccess) >= Length && tex.Texture is not null)
+            {
+                tex.Texture.Dispose();
+                remove.Add(name);
+                clearCount++;
+            }
+        }
+
+        foreach (var name in remove) matTexCache.Remove(name);
         remove.Clear();
 
         // then, clean up prop textures

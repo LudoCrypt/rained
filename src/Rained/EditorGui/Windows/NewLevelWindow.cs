@@ -15,6 +15,7 @@ static class NewLevelWindow
     private static float levelScreenW;
     private static float levelScreenH;
     private static int levelBufL, levelBufR, levelBufT, levelBufB;
+    private static int camBuffX, camBuffY;
     private static bool[] fillLayer = new bool[3];
     private static bool autoCameras;
 
@@ -28,22 +29,24 @@ static class NewLevelWindow
 
     public static void OpenWindow()
     {
-        levelWidth = 72;
-        levelHeight = 43;
-        levelBufL = 12;
-        levelBufR = 12;
-        levelBufT = 3;
-        levelBufB = 5;
-        fillLayer[0] = true;
-        fillLayer[1] = true;
+        levelWidth = 85;
+        levelHeight = 58;
+        levelBufL = 17;
+        levelBufR = 17;
+        levelBufT = 10;
+        levelBufB = 10;
+        fillLayer[0] = false;
+        fillLayer[1] = false;
         fillLayer[2] = false;
         autoCameras = true;
+        camBuffX = 6;
+        camBuffY = 5;
 
         IsWindowOpen = true;
 
         // using the formula from the modding wiki
-        levelScreenW = (levelWidth - 20) / 52f;
-        levelScreenH = (levelHeight - 3) / 40f;
+        levelScreenW = CalcScreenWidth();
+        levelScreenH = CalcScreenHeight();
     }
 
     public static void ShowWindow()
@@ -76,12 +79,12 @@ static class NewLevelWindow
                 {
                     // tile size
                     if (ImGui.InputInt("Width", ref levelWidth))
-                        levelScreenW = (levelWidth - 20) / 52f;
+                        levelScreenW = CalcScreenWidth();
                     
                     levelWidth = Math.Max(levelWidth, 1); // minimum value is 1
 
                     if (ImGui.InputInt("Height", ref levelHeight))
-                        levelScreenH = (levelHeight - 3) / 40f;
+                        levelScreenH = CalcScreenHeight();
                     
                     levelHeight = Math.Max(levelHeight, 1); // minimum value is 1
 
@@ -90,13 +93,13 @@ static class NewLevelWindow
                     {
                         if (ImGui.InputFloat("Screen Width", ref levelScreenW, 0.5f, 0.125f))
                         {
-                            levelWidth = (int)(levelScreenW * 52f + 20f);
+                            levelWidth = CalcLevelWidth();
                         }
                         levelScreenW = Math.Max(levelScreenW, 0);
 
                         if (ImGui.InputFloat("Screen Height", ref levelScreenH, 0.5f, 0.125f))
                         {
-                            levelHeight = (int)(levelScreenH * 40f + 3f);
+                            levelHeight = CalcLevelHeight();
                         }
                         levelScreenH = Math.Max(levelScreenH, 0); // minimum value is 1
                     }
@@ -126,6 +129,16 @@ static class NewLevelWindow
                 ImGui.SeparatorText("Options");
                 {
                     ImGui.Checkbox("Auto-place Cameras", ref autoCameras);
+                    
+                    if (ImGui.InputInt("Camera Overlap W", ref camBuffX)) {
+                        levelScreenW = CalcScreenWidth();
+                        camBuffX = Math.Max(camBuffX, 0);
+                    }
+
+                    if (ImGui.InputInt("Camera Overlap H", ref camBuffY)) {
+                        levelScreenH = CalcScreenHeight();
+                        camBuffY = Math.Max(camBuffY, 0);
+                    }
                 }
 
                 ImGui.PopItemWidth();
@@ -168,6 +181,23 @@ static class NewLevelWindow
         }
     }
 
+    private static float CalcScreenWidth() {
+        return (levelWidth - camBuffX - 34f) / (51f - camBuffX);
+    }
+
+    private static float CalcScreenHeight() {
+        return (levelHeight - camBuffY - 20f) / (38f - camBuffY);
+    }
+
+
+    private static int CalcLevelWidth() {
+        return (int)Math.Max(Math.Floor(51f * levelScreenW - levelScreenW * camBuffX + camBuffX + 34f), 0);
+    }
+
+    private static int CalcLevelHeight() {
+        return (int)Math.Max(Math.Floor(38f * levelScreenH - levelScreenH * camBuffY + camBuffY + 20f), 0);
+    }
+
     private static List<Vector2> CalcCameraPositions()
         => CalcCameraPositions([]);
 
@@ -180,21 +210,8 @@ static class NewLevelWindow
             return cameraPositions;
         }
 
-        var screenW = (int)MathF.Floor( Math.Max(1f, (levelWidth - 20) / 52f) );
-        var screenH = (int)MathF.Floor( Math.Max(1f, (levelHeight - 3) / 40f) );
-        var levelCenter = new Vector2(
-            levelBufL + levelWidth - levelBufR,
-            levelBufT + levelHeight - levelBufB
-        ) / 2f;
-
-        // uhh why do i have to do this
-        // what does StandardSize mean, exactly ??
-        var camTotalSize = new Vector2(
-            Camera.StandardSize.X * screenW,
-            Camera.StandardSize.Y * screenH
-        );
-        var camTopLeft = levelCenter - camTotalSize / 2f;
-        var camOffset = (Camera.Size - Camera.StandardSize) / 2f;
+        var screenW = (int)MathF.Round(Math.Max(1f, CalcScreenWidth()));
+        var screenH = (int)MathF.Round(Math.Max(1f, CalcScreenHeight()));
 
         cameraPositions.Clear();
 
@@ -202,7 +219,7 @@ static class NewLevelWindow
         {
             for (int col = 0; col < screenW; col++)
             {
-                var camPos = camTopLeft + Camera.StandardSize * new Vector2(col, row) - camOffset;
+                var camPos = (Camera.StandardSize - new Vector2(camBuffX, camBuffY)) * new Vector2(col, row) + new Vector2(levelBufL - 10, levelBufT - 1);
                 cameraPositions.Add(camPos);
             }
         }

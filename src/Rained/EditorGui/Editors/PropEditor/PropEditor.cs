@@ -470,7 +470,7 @@ partial class PropEditor : IEditorMode
         }
 
         // prop transform gizmos
-        if (selectedProps.Count > 0 && !isRopeSimulationActive && !zTranslateActive)
+        if (selectedProps.Count > 0 && !zTranslateActive)
         {
             bool canWarp = transformMode is WarpTransformMode ||
                 (isWarpMode && selectedProps.Count == 1);
@@ -626,13 +626,33 @@ partial class PropEditor : IEditorMode
                         var pA = prop.Rect.Center + new Vector2(cos, sin) * -prop.Rect.Size.X / 2f;
                         var pB = prop.Rect.Center + new Vector2(cos, sin) * prop.Rect.Size.X / 2f;
 
+                        var a = 0;
+                        if (prop.Rope != null && prop.Rope.Model != null) {
+                            a = prop.Rope!.Model!.SegmentCount;
+                        }
+
                         for (int i = 0; i < 2; i++)
                         {
+                            Vector2 ppoint;
+
+                            if (i == 0) {
+                                ppoint = pA;
+                            }
+                            else if (i == 1) {
+                                ppoint = pB;
+                            }
+                            else {
+                                ppoint = prop.Rope!.Model!.GetSegmentPos(i - 2);
+                            }
+
+                            if (prop.Rope != null && prop.Rope.Model != null) {
+                                Raylib.DrawCircleLinesV(ppoint * Level.TileSize, prop.Rope!.Model!.physics.segRad, new Color(255, 255, 255, 255));
+                            }
+
                             if (transformMode is LongTransformMode ropeMode && ropeMode.handleId != i)
                                 continue;
-                            
-                            if (DrawGizmoHandle(i == 1 ? pB : pA, 2) && EditorWindow.IsMouseClicked(ImGuiMouseButton.Left))
-                            {
+
+                            if (DrawGizmoHandle(i == 1 ? pB : i == 0 ? pA : prop.Rope!.Model!.GetSegmentPos(i - 2), i <= 1 ? 2 : 0) && EditorWindow.IsMouseClicked(ImGuiMouseButton.Left)) {
                                 BeginTransformMode(new LongTransformMode(
                                     handleId: i,
                                     prop: prop,
@@ -643,6 +663,8 @@ partial class PropEditor : IEditorMode
                     }
                 }
             }
+            
+            changeRecorder.PushChanges();
         }
 
         // draw drag rect
@@ -693,7 +715,7 @@ partial class PropEditor : IEditorMode
         }
 
         // in prop transform mode
-        if (!isModeMouseDown && !isRopeSimulationActive && !zTranslateActive)
+        if (!isModeMouseDown && !zTranslateActive)
         {
             // in default mode
             PropSelectUpdate();

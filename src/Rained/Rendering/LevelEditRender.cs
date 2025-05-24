@@ -429,15 +429,6 @@ class LevelEditRender : IDisposable
         int viewR = (int) Math.Ceiling(ViewBottomRight.X);
         int viewB = (int) Math.Ceiling(ViewBottomRight.Y);
 
-        if (RainEd.Instance.Preferences.ViewPreviews)
-        {
-            tileRenderer.Render(layer, alpha);
-        }
-        else
-        {
-            tileRenderer.PreviewRender(layer, alpha);
-        }
-
         // draw material color squares
         for (int x = Math.Max(0, viewL); x < Math.Min(Level.Width, viewR); x++)
         {
@@ -455,6 +446,15 @@ class LevelEditRender : IDisposable
                     );
                 }
             }
+        }
+
+        if (RainEd.Instance.Preferences.ViewPreviews)
+        {
+            tileRenderer.Render(layer, alpha);
+        }
+        else
+        {
+            tileRenderer.PreviewRender(layer, alpha);
         }
 
         // draw chains from chain holders
@@ -831,6 +831,46 @@ class LevelEditRender : IDisposable
             vec = dstPos + dstSize * new Vector2(dr.Right, dr.Top);
             draw.TexCoord(sr.Right / texW, sr.Top / texH);
             draw.Vertex(vec.X, vec.Y, z);
+        });
+    }
+    
+    public static void DrawTextureTriangleSublayer(LargeTexture tex, Rectangle rSrcRec, Rectangle rDstRec, int sublayer, Glib.Color tint, int leaveOut) {
+        float z = GetSublayerZCoord(sublayer);
+
+        tex.DrawRectangle(rSrcRec, new Rectangle(0f, 0f, 1f, 1f), (subtex, sr, dr) => {
+            using var draw = RainEd.RenderContext.BeginBatchDraw(Glib.BatchDrawMode.Triangles, subtex);
+            var dstSize = rDstRec.Size;
+            var dstPos = rDstRec.Position;
+
+            Vector2 vec;
+            var texW = subtex.Width;
+            var texH = subtex.Height;
+
+            draw.Color(tint);
+
+            if (leaveOut != 1) {
+                vec = dstPos + dstSize * new Vector2(dr.Left, dr.Top);
+                draw.TexCoord(sr.Left / texW, sr.Top / texH);
+                draw.Vertex(vec.X, vec.Y, z);
+            }
+
+            if (leaveOut != 3) {
+                vec = dstPos + dstSize * new Vector2(dr.Left, dr.Bottom);
+                draw.TexCoord(sr.Left / texW, sr.Bottom / texH);
+                draw.Vertex(vec.X, vec.Y, z);
+            }
+
+            if (leaveOut != 2) {
+                vec = dstPos + dstSize * new Vector2(dr.Right, dr.Bottom);
+                draw.TexCoord(sr.Right / texW, sr.Bottom / texH);
+                draw.Vertex(vec.X, vec.Y, z);
+            }
+
+            if (leaveOut != 0) {
+                vec = dstPos + dstSize * new Vector2(dr.Right, dr.Top);
+                draw.TexCoord(sr.Right / texW, sr.Top / texH);
+                draw.Vertex(vec.X, vec.Y, z);
+            }
         });
     }
 

@@ -418,6 +418,648 @@ class TileRenderer
         int viewT = (int) Math.Floor(renderInfo.ViewTopLeft.Y);
         int viewR = (int) Math.Ceiling(renderInfo.ViewBottomRight.X);
         int viewB = (int) Math.Ceiling(renderInfo.ViewBottomRight.Y);
+        
+        
+        #region
+
+        // Draw material previews
+
+        Vector2[][] askDirs = [[new Vector2(-1, 0), new Vector2(0, 1)], [new Vector2(0, 1), new Vector2(1, 0)], [new Vector2(-1, 0), new Vector2(0, -1)], [new Vector2(0, -1), new Vector2(1, 0)]];
+
+        ref LevelCell getGeo(int x, int y) {
+            return ref level.Layers[layer, Math.Clamp(x, 0, level.Width - 1), Math.Clamp(y, 0, level.Height - 1)];
+        }
+
+        bool matchesMat(int x, int y, int matIn) {
+            return getGeo(x, y).Material.Equals(matIn) && !getGeo(x, y).Geo.Equals(GeoType.Air) && !getGeo(x, y).Geo.Equals(GeoType.Platform) && !getGeo(x, y).HasTile();
+        }
+
+        Rectangle GetGraphicSublayerMat(int y, int x, int sublayer) {
+            return new Rectangle(
+                20 * x + 5,
+                20 * (y + (sublayer * 4)) + 5,
+                20, 20
+            );
+        }
+
+        Rectangle getBlockRect(int x, int y, int corner, int sublayer) {
+            int matIn = getGeo(x, y).Material;
+
+            bool matches(int x, int y) {
+                return matchesMat(x, y, matIn);
+            }
+
+            bool up = matches(x, y - 1);
+            bool down = matches(x, y + 1);
+            bool left = matches(x - 1, y);
+            bool right = matches(x + 1, y);
+
+            bool upleft = matches(x - 1, y - 1);
+            bool downleft = matches(x - 1, y + 1);
+            bool upright = matches(x + 1, y - 1);
+            bool downright = matches(x + 1, y + 1);
+
+            switch (corner) {
+                case 0:
+
+                    if (!up && !left) {
+                        return GetGraphicSublayerMat(0, 0, sublayer);
+                    }
+
+                    if (up && !left) {
+                        return GetGraphicSublayerMat(0, 1, sublayer);
+                    }
+
+                    if (!up && left) {
+                        return GetGraphicSublayerMat(0, 2, sublayer);
+                    }
+
+                    if (up && left && !upleft) {
+                        return GetGraphicSublayerMat(0, 3, sublayer);
+                    }
+
+                    if (up && left && upleft) {
+                        return GetGraphicSublayerMat(0, 4, sublayer);
+                    }
+
+                    break;
+                case 1:
+
+                    if (!up && !right) {
+                        return GetGraphicSublayerMat(1, 0, sublayer);
+                    }
+
+                    if (up && !right) {
+                        return GetGraphicSublayerMat(1, 1, sublayer);
+                    }
+
+                    if (!up && right) {
+                        return GetGraphicSublayerMat(0, 2, sublayer);
+                    }
+
+                    if (up && right && !upright) {
+                        return GetGraphicSublayerMat(1, 3, sublayer);
+                    }
+
+                    if (up && right && upright) {
+                        return GetGraphicSublayerMat(0, 4, sublayer);
+                    }
+
+                    break;
+                case 2:
+
+                    if (!down && !right) {
+                        return GetGraphicSublayerMat(2, 0, sublayer);
+                    }
+
+                    if (down && !right) {
+                        return GetGraphicSublayerMat(1, 1, sublayer);
+                    }
+
+                    if (!down && right) {
+                        return GetGraphicSublayerMat(2, 2, sublayer);
+                    }
+
+                    if (down && right && !downright) {
+                        return GetGraphicSublayerMat(2, 3, sublayer);
+                    }
+
+                    if (down && right && downright) {
+                        return GetGraphicSublayerMat(0, 4, sublayer);
+                    }
+
+                    break;
+                case 3:
+
+                    if (!down && !left) {
+                        return GetGraphicSublayerMat(3, 0, sublayer);
+                    }
+
+                    if (down && !left) {
+                        return GetGraphicSublayerMat(0, 1, sublayer);
+                    }
+
+                    if (!down && left) {
+                        return GetGraphicSublayerMat(2, 2, sublayer);
+                    }
+
+                    if (down && left && !downleft) {
+                        return GetGraphicSublayerMat(3, 3, sublayer);
+                    }
+
+                    if (down && left && downleft) {
+                        return GetGraphicSublayerMat(0, 4, sublayer);
+                    }
+
+                    break;
+            }
+
+            return GetGraphicSublayerMat(0, 0, sublayer);
+        }
+
+        for (int x = Math.Max(0, viewL); x < Math.Min(level.Width, viewR); x++) {
+            for (int y = Math.Max(0, viewT); y < Math.Min(level.Height, viewB); y++) {
+                ref var cell = ref getGeo(x, y);
+
+                if (cell.HasTile()) {
+                    var tile = level.GetTile(cell);
+                    if (tile is null) {
+                        if (curShader != null) {
+                            curShader = null;
+                            Raylib.EndShaderMode();
+                            RainEd.RenderContext.Flags = Glib.RenderFlags.None;
+                        }
+
+                        var srcRec = new Rectangle(0f, 0f, 2f, 2f);
+                        Raylib.DrawTexturePro(RainEd.Instance.PlaceholderTexture, srcRec, new Rectangle(x * Level.TileSize, y * Level.TileSize, Level.TileSize, Level.TileSize), Vector2.Zero, 0f, Color.White);
+                    }
+                }
+
+                if (!cell.HasTile() && cell.Material != 0 && cell.Geo != GeoType.Air) {
+                    MaterialInfo mat = RainEd.Instance.MaterialDatabase.GetMaterial(cell.Material);
+                    if (mat.Init != null) {
+
+                        if (cell.Geo.Equals(GeoType.Solid)) {
+                            if (mat.Init.ContainsKey("block")) {
+
+                                Lingo.PropertyList block = (Lingo.PropertyList)mat.Init["block"];
+
+                                var rectPos = new Vector2(x, y);
+                                var rectSize = new Vector2(1, 1);
+
+                                var matName = mat.Name;
+
+                                if (block.ContainsKey("isDefaultMat")) {
+                                    matName = "tileSet" + block["fakeInternalName"].ToString();
+                                }
+
+                                var tex = gfxProvider.GetMaterialTexture(matName);
+                                var dstRec = new Rectangle(rectPos * Level.TileSize, rectSize * Level.TileSize);
+
+                                if (tex is null) {
+                                    if (curShader != null) {
+                                        curShader = null;
+                                        Raylib.EndShaderMode();
+                                        RainEd.RenderContext.Flags = Glib.RenderFlags.None;
+                                    }
+
+                                    Raylib.EndShaderMode();
+                                    var srcRec = new Rectangle(0f, 0f, 2f, 2f);
+                                    Raylib.DrawTexturePro(RainEd.Instance.PlaceholderTexture, srcRec, dstRec, Vector2.Zero, 0f, Color.White);
+                                }
+                                else {
+                                    if (curShader != shader) {
+                                        curShader = shader;
+                                        RainEd.RenderContext.Flags = Glib.RenderFlags.DepthTest;
+
+                                        if (shader == Shaders.PaletteShader)
+                                            renderInfo.Palette.BeginPaletteShaderMode();
+                                        else
+                                            Raylib.BeginShaderMode(shader);
+                                    }
+
+                                    Lingo.LinearList repeatL = (Lingo.LinearList)block["repeatL"];
+
+                                    for (int l = repeatL.Count - 1; l >= 0; l--) {
+                                        Glib.Color col = Glib.Color.FromRGBA(255, 255, 255, alpha);
+
+                                        if (renderPalette) {
+                                            var paletteIndex = mat.blockLayerDepths[l] / 30f;
+                                            col = new Glib.Color(Math.Clamp(paletteIndex, 0f, 1f), 0f, 0f, col.A);
+                                        }
+                                        else {
+                                            // fade to white as the layer is further away
+                                            // from the front
+                                            float a = (float)mat.blockLayerDepths[l] / 10.0f;
+                                            col.R = col.R * (1f - a) + (col.R * 0.5f) * a;
+                                            col.G = col.G * (1f - a) + (col.G * 0.5f) * a;
+                                            col.B = col.B * (1f - a) + (col.B * 0.5f) * a;
+                                        }
+
+                                        int realL = l;
+                                        var addRect = new Vector2(0, 0);
+
+                                        if (block.ContainsKey("isDefaultMat")) {
+                                            realL = 0;
+                                            addRect = new Vector2(l == 0 ? 0 : 120, 0);
+                                        }
+
+                                        var srcRec = getBlockRect(x, y, 0, realL) + addRect;
+                                        var cDstRec = new Rectangle(rectPos * Level.TileSize + new Vector2(-5f, -5f), rectSize * Level.TileSize);
+                                        LevelEditRender.DrawTextureSublayer(tex, srcRec, cDstRec, layer * 10 + mat.blockLayerDepths[l], col);
+
+                                        srcRec = getBlockRect(x, y, 1, realL) + addRect;
+                                        cDstRec = new Rectangle(rectPos * Level.TileSize + new Vector2(5f, -5f), rectSize * Level.TileSize);
+                                        LevelEditRender.DrawTextureSublayer(tex, srcRec, cDstRec, layer * 10 + mat.blockLayerDepths[l], col);
+
+                                        srcRec = getBlockRect(x, y, 2, realL) + addRect;
+                                        cDstRec = new Rectangle(rectPos * Level.TileSize + new Vector2(5f, 5f), rectSize * Level.TileSize);
+                                        LevelEditRender.DrawTextureSublayer(tex, srcRec, cDstRec, layer * 10 + mat.blockLayerDepths[l], col);
+
+                                        srcRec = getBlockRect(x, y, 3, realL) + addRect;
+                                        cDstRec = new Rectangle(rectPos * Level.TileSize + new Vector2(-5f, 5f), rectSize * Level.TileSize);
+                                        LevelEditRender.DrawTextureSublayer(tex, srcRec, cDstRec, layer * 10 + mat.blockLayerDepths[l], col);
+
+                                    }
+                                }
+                            }
+                        }
+                        else if (cell.Geo.Equals(GeoType.SlopeLeftDown) || cell.Geo.Equals(GeoType.SlopeLeftUp) || cell.Geo.Equals(GeoType.SlopeRightUp) || cell.Geo.Equals(GeoType.SlopeRightDown)) {
+                            if (mat.Init.ContainsKey("slope")) {
+
+                                Lingo.PropertyList slope = (Lingo.PropertyList)mat.Init["slope"];
+
+                                var rectPos = new Vector2(x, y);
+                                var rectSize = new Vector2(1, 1);
+
+                                var matName = mat.Name + "Slopes";
+
+                                if (slope.ContainsKey("isDefaultMat")) {
+                                    matName = "tileSet" + slope["fakeInternalName"].ToString();
+                                }
+
+                                var tex = gfxProvider.GetMaterialTexture(matName);
+                                var dstRec = new Rectangle(rectPos * Level.TileSize - new Vector2(5f, 5f), rectSize * Level.TileSize + new Vector2(10f, 10f));
+
+                                if (tex is null) {
+                                    if (curShader != null) {
+                                        curShader = null;
+                                        Raylib.EndShaderMode();
+                                        RainEd.RenderContext.Flags = Glib.RenderFlags.None;
+                                    }
+
+                                    Raylib.EndShaderMode();
+                                    var srcRec = new Rectangle(0f, 0f, 2f, 2f);
+                                    Raylib.DrawTexturePro(RainEd.Instance.PlaceholderTexture, srcRec, dstRec, Vector2.Zero, 0f, Color.White);
+                                }
+                                else {
+                                    if (curShader != shader) {
+                                        curShader = shader;
+                                        RainEd.RenderContext.Flags = Glib.RenderFlags.DepthTest;
+
+                                        if (shader == Shaders.PaletteShader)
+                                            renderInfo.Palette.BeginPaletteShaderMode();
+                                        else
+                                            Raylib.BeginShaderMode(shader);
+                                    }
+
+                                    Lingo.LinearList repeatL = (Lingo.LinearList)slope["repeatL"];
+
+                                    Vector2[] dir = askDirs[((int)cell.Geo) - 2];
+
+                                    for (int l = repeatL.Count - 1; l >= 0; l--) {
+                                        Glib.Color col = Glib.Color.FromRGBA(255, 255, 255, alpha);
+
+                                        if (renderPalette) {
+                                            var paletteIndex = mat.slopeLayerDepths[l] / 30f;
+                                            col = new Glib.Color(Math.Clamp(paletteIndex, 0f, 1f), 0f, 0f, col.A);
+                                        }
+                                        else {
+                                            // fade to white as the layer is further away
+                                            // from the front
+                                            float a = (float)mat.slopeLayerDepths[l] / 10.0f;
+                                            col.R = col.R * (1f - a) + (col.R * 0.5f) * a;
+                                            col.G = col.G * (1f - a) + (col.G * 0.5f) * a;
+                                            col.B = col.B * (1f - a) + (col.B * 0.5f) * a;
+                                        }
+
+                                        for (int ad = 0; ad < 2; ad++) {
+
+                                            Vector2 adir = new Vector2(x, y) + dir[ad];
+                                            Vector2 inPos = new Vector2(5, 5) + new Vector2(60 * ad, 30 * (((int)cell.Geo) - 2));
+
+                                            if (matchesMat(((int)adir.X), ((int)adir.Y), cell.Material)) {
+                                                inPos += new Vector2(30, 0);
+                                            }
+
+                                            int realL = l;
+                                            var addRect = new Vector2(0, 0);
+
+                                            if (slope.ContainsKey("isDefaultMat")) {
+                                                realL = 0;
+                                                addRect = new Vector2(l == 0 ? 0 : 120, 80);
+                                            }
+
+                                            Rectangle srcRect = new Rectangle(inPos + new Vector2(0, 130 * realL) + addRect, new Vector2(30, 30));
+
+                                            LevelEditRender.DrawTextureSublayer(tex, srcRect, dstRec, layer * 10 + mat.slopeLayerDepths[l], col);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (mat.Init.ContainsKey("texture")) {
+                            Lingo.PropertyList texture = (Lingo.PropertyList)mat.Init["texture"];
+
+                            var rectPos = new Vector2(x, y);
+                            var rectSize = new Vector2(1, 1);
+
+                            var matName = mat.Name;
+                            var offset = new Vector2(0, 1);
+
+                            if (texture.ContainsKey("isDefaultMat")) {
+                                matName = texture["fakeInternalName"].ToString();
+                                offset = new Vector2(0, 0);
+                            }
+
+                            var tex = gfxProvider.GetMaterialTexture(matName + "Texture");
+                            var dstRec = new Rectangle(rectPos * Level.TileSize, rectSize * Level.TileSize);
+
+                            if (tex is null) {
+                                if (curShader != null) {
+                                    curShader = null;
+                                    Raylib.EndShaderMode();
+                                    RainEd.RenderContext.Flags = Glib.RenderFlags.None;
+                                }
+
+                                Raylib.EndShaderMode();
+                                var srcRec = new Rectangle(0f, 0f, 2f, 2f);
+                                Raylib.DrawTexturePro(RainEd.Instance.PlaceholderTexture, srcRec, dstRec, Vector2.Zero, 0f, Color.White);
+                            }
+                            else {
+                                if (curShader != shader) {
+                                    curShader = shader;
+                                    RainEd.RenderContext.Flags = Glib.RenderFlags.DepthTest;
+
+                                    if (shader == Shaders.PaletteShader)
+                                        renderInfo.Palette.BeginPaletteShaderMode();
+                                    else
+                                        Raylib.BeginShaderMode(shader);
+                                }
+
+                                Lingo.LinearList repeatL = (Lingo.LinearList)texture["repeatL"];
+                                Vector2 size = (Vector2)texture["sz"];
+
+                                for (int l = repeatL.Count - 1; l >= 0; l--) {
+                                    Glib.Color col = Glib.Color.FromRGBA(255, 255, 255, alpha);
+
+                                    if (renderPalette) {
+                                        var paletteIndex = mat.textureLayerDepths[l] / 30f;
+                                        col = new Glib.Color(Math.Clamp(paletteIndex, 0f, 1f), 0f, 0f, col.A);
+                                    }
+                                    else {
+                                        // fade to white as the layer is further away
+                                        // from the front
+                                        float a = (float)mat.textureLayerDepths[l] / 10.0f;
+                                        col.R = col.R * (1f - a) + (col.R * 0.5f) * a;
+                                        col.G = col.G * (1f - a) + (col.G * 0.5f) * a;
+                                        col.B = col.B * (1f - a) + (col.B * 0.5f) * a;
+                                    }
+
+                                    var srcRect = new Rectangle(new Vector2(x % size.X, (y % size.Y) + l * size.Y) * 20 + offset, rectSize * Level.TileSize);
+
+                                    if (cell.Geo.Equals(GeoType.SlopeLeftDown) || cell.Geo.Equals(GeoType.SlopeLeftUp) || cell.Geo.Equals(GeoType.SlopeRightUp) || cell.Geo.Equals(GeoType.SlopeRightDown)) {
+                                        LevelEditRender.DrawTextureTriangleSublayer(tex, srcRect, dstRec, layer * 10 + mat.textureLayerDepths[l], col, ((int)cell.Geo) - 2);
+                                    }
+                                    else if (cell.Geo.Equals(GeoType.Solid)) {
+                                        LevelEditRender.DrawTextureSublayer(tex, srcRect, dstRec, layer * 10 + mat.textureLayerDepths[l], col);
+                                    }
+
+                                }
+                            }
+                        }
+
+                        if (mat.Init.ContainsKey("pipelike")) {
+
+                            Lingo.PropertyList pipelike = (Lingo.PropertyList)mat.Init["pipelike"];
+
+                            var rectPos = new Vector2(x, y);
+
+                            var matName = mat.Name + "Pipes";
+
+                            var bfOffset = new Vector2(10, 10);
+
+                            if (pipelike.ContainsKey("isDefaultMat")) {
+                                matName = pipelike["fakeInternalName"].ToString();
+                                bfOffset = (Vector2)pipelike["bfOffset"];
+                            }
+
+                            var isDense = false;
+
+                            if (pipelike.ContainsKey("denseMat")) {
+                                isDense = Lingo.LingoNumber.AsInt(pipelike["denseMat"]) == 1;
+                            }
+
+                            var tex = gfxProvider.GetMaterialTexture(matName);
+                            var dstRec = new Rectangle(rectPos * Level.TileSize - bfOffset, new Vector2(40, 40));
+
+                            if (tex is null) {
+                                if (curShader != null) {
+                                    curShader = null;
+                                    Raylib.EndShaderMode();
+                                    RainEd.RenderContext.Flags = Glib.RenderFlags.None;
+                                }
+
+                                Raylib.EndShaderMode();
+                                var srcRec = new Rectangle(0f, 0f, 2f, 2f);
+                                Raylib.DrawTexturePro(RainEd.Instance.PlaceholderTexture, srcRec, dstRec, Vector2.Zero, 0f, Color.White);
+                            }
+                            else {
+                                if (curShader != shader) {
+                                    curShader = shader;
+                                    RainEd.RenderContext.Flags = Glib.RenderFlags.DepthTest;
+
+                                    if (shader == Shaders.PaletteShader)
+                                        renderInfo.Palette.BeginPaletteShaderMode();
+                                    else
+                                        Raylib.BeginShaderMode(shader);
+                                }
+
+                                int[] depths = [2, 3, 6, 7];
+                                if (pipelike.ContainsKey("depths")) {
+                                    depths = ((Lingo.LinearList)pipelike["depths"]).Select(ln => (int)ln).ToArray();
+                                }
+
+
+                                Vector2 gtPos = new(0, 0);
+
+                                switch (((int)cell.Geo)) {
+                                    case 1:
+                                        string nbrs = "";
+                                        foreach (var dir in new[] { new Vector2(-1, 0), new Vector2(0, -1), new Vector2(1, 0), new Vector2(0, 1) }) {
+                                            nbrs += matchesMat(x + (int)dir.X, y + (int)dir.Y, cell.Material) ? "1" : "0";
+                                        }
+
+                                        switch (nbrs) {
+                                            case "0101":
+                                                gtPos = new Vector2(2, 2);
+                                                break;
+                                            case "1010":
+                                                gtPos = new Vector2(4, 2);
+                                                break;
+                                            case "1111":
+                                                gtPos = new Vector2(6, 2);
+                                                break;
+                                            case "0111":
+                                                gtPos = new Vector2(8, 2);
+                                                break;
+                                            case "1101":
+                                                gtPos = new Vector2(10, 2);
+                                                break;
+                                            case "1110":
+                                                gtPos = new Vector2(12, 2);
+                                                break;
+                                            case "1011":
+                                                gtPos = new Vector2(14, 2);
+                                                break;
+                                            case "0011":
+                                                gtPos = new Vector2(16, 2);
+                                                break;
+                                            case "1001":
+                                                gtPos = new Vector2(18, 2);
+                                                break;
+                                            case "1100":
+                                                gtPos = new Vector2(20, 2);
+                                                break;
+                                            case "0110":
+                                                gtPos = new Vector2(22, 2);
+                                                break;
+                                            case "1000":
+                                                gtPos = new Vector2(24, 2);
+                                                break;
+                                            case "0010":
+                                                gtPos = new Vector2(26, 2);
+                                                break;
+                                            case "0100":
+                                                gtPos = new Vector2(28, 2);
+                                                break;
+                                            case "0001":
+                                                gtPos = new Vector2(30, 2);
+                                                break;
+                                            case "0000":
+                                                gtPos = new Vector2(40, 2);
+                                                break;
+                                        }
+                                        break;
+
+                                    case 3:
+                                        gtPos = new Vector2(32, 2);
+                                        break;
+                                    case 2:
+                                        gtPos = new Vector2(34, 2);
+                                        break;
+                                    case 4:
+                                        gtPos = new Vector2(36, 2);
+                                        break;
+                                    case 5:
+                                        gtPos = new Vector2(38, 2);
+                                        break;
+                                    case 6:
+                                        gtPos = new Vector2(42, 2);
+                                        break;
+                                }
+
+                                if (isDense) {
+                                    switch (((int)cell.Geo)) {
+                                        case 1:
+                                            string nbrs = "";
+                                            foreach (var dir in new[] { new Vector2(-1, 0), new Vector2(0, -1), new Vector2(1, 0), new Vector2(0, 1) }) {
+                                                nbrs += matchesMat(x + (int)dir.X, y + (int)dir.Y, cell.Material) ? "1" : "0";
+                                            }
+
+                                            switch (nbrs) {
+                                                case "0000":
+                                                    gtPos = new Vector2(2, 2);
+                                                    break;
+                                                case "1111":
+                                                    gtPos = new Vector2(4, 2);
+                                                    break;
+                                                case "0101":
+                                                    gtPos = new Vector2(6, 2);
+                                                    break;
+                                                case "1010":
+                                                    gtPos = new Vector2(8, 2);
+                                                    break;
+                                                case "0001":
+                                                    gtPos = new Vector2(10, 2);
+                                                    break;
+                                                case "1000":
+                                                    gtPos = new Vector2(12, 2);
+                                                    break;
+                                                case "0100":
+                                                    gtPos = new Vector2(14, 2);
+                                                    break;
+                                                case "0010":
+                                                    gtPos = new Vector2(16, 2);
+                                                    break;
+                                                case "1001":
+                                                    gtPos = new Vector2(18, 2);
+                                                    break;
+                                                case "1100":
+                                                    gtPos = new Vector2(20, 2);
+                                                    break;
+                                                case "0110":
+                                                    gtPos = new Vector2(22, 2);
+                                                    break;
+                                                case "0011":
+                                                    gtPos = new Vector2(24, 2);
+                                                    break;
+                                                case "1011":
+                                                    gtPos = new Vector2(26, 2);
+                                                    break;
+                                                case "1101":
+                                                    gtPos = new Vector2(28, 2);
+                                                    break;
+                                                case "1110":
+                                                    gtPos = new Vector2(30, 2);
+                                                    break;
+                                                case "0111":
+                                                    gtPos = new Vector2(32, 2);
+                                                    break;
+                                            }
+                                            break;
+
+                                        case 3:
+                                            gtPos = new Vector2(38, 2);
+                                            break;
+                                        case 2:
+                                            gtPos = new Vector2(40, 2);
+                                            break;
+                                        case 4:
+                                            gtPos = new Vector2(34, 2);
+                                            break;
+                                        case 5:
+                                            gtPos = new Vector2(36, 2);
+                                            break;
+                                        case 6:
+                                            gtPos = new Vector2(42, 2);
+                                            break;
+                                    }
+                                }
+
+
+                                Vector2 va = new((gtPos.X - 1) * 20 - 10, (gtPos.Y - 1) * 20 - 9);
+
+                                Rectangle r = new(va, dstRec.Size);
+
+                                for (int i = 0; i < depths.Length; i++) {
+                                    Glib.Color col = Glib.Color.FromRGBA(255, 255, 255, alpha);
+
+                                    if (renderPalette) {
+                                        var paletteIndex = depths[i] / 30f;
+                                        col = new Glib.Color(Math.Clamp(paletteIndex, 0f, 1f), 0f, 0f, col.A);
+                                    }
+                                    else {
+                                        // fade to white as the layer is further away
+                                        // from the front
+                                        float a = (float)depths[i] / 10.0f;
+                                        col.R = col.R * (1f - a) + (col.R * 0.5f) * a;
+                                        col.G = col.G * (1f - a) + (col.G * 0.5f) * a;
+                                        col.B = col.B * (1f - a) + (col.B * 0.5f) * a;
+                                    }
+
+                                    LevelEditRender.DrawTextureSublayer(tex, r, dstRec, layer * 10 + depths[i], col);
+                                }
+
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        #endregion
 
         foreach (var tileRender in tileRenders)
         {
@@ -518,6 +1160,37 @@ class TileRenderer
                         }
 
                     }
+                    
+                    
+                    #region
+                    if (init.Tags.Contains("Big Wheel")) {
+                        var tetex = gfxProvider.GetTileTexture("Big Wheel Graf");
+                        for (int l = 0; l < 10; l++) {
+                            if (l == 0 || l == 1 || l == 2 || l == 7 || l == 8 || l == 9) {
+
+                                // if rendering palette, R channel represents sublayer
+                                // A channel is alpha, as usual
+                                Glib.Color col = Glib.Color.FromRGBA(drawColor.R, drawColor.G, drawColor.B, drawColor.A);
+
+                                if (renderPalette) {
+                                    var paletteIndex = l / 30f;
+                                    col = new Glib.Color(Math.Clamp(paletteIndex, 0f, 1f), 0f, 0f, col.A);
+                                }
+                                else {
+                                    // fade to white as the layer is further away
+                                    // from the front
+                                    float a = (float)l / init.LayerDepth;
+                                    col.R = col.R * (1f - a) + (col.R * 0.5f) * a;
+                                    col.G = col.G * (1f - a) + (col.G * 0.5f) * a;
+                                    col.B = col.B * (1f - a) + (col.B * 0.5f) * a;
+                                }
+
+                                LevelEditRender.DrawTextureSublayer(tetex, new Rectangle(0, 0, 180, 180), new Rectangle(rectPos * Level.TileSize - new Vector2(52, 50), new Vector2(181, 180)), layer * 10 + l, col);
+                            }
+                        }
+                    }
+                    #endregion
+                    
                 }
             }
         }

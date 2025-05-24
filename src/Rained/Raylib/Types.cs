@@ -185,6 +185,12 @@ struct Rectangle(float x, float y, float width, float height)
 
     public readonly Vector2 Position => new(X, Y);
     public readonly Vector2 Size => new(Width, Height);
+        
+    public static Rectangle operator +(Rectangle left, Vector2 right) {
+        return new Rectangle(
+            left.X + right.X, left.Y + right.Y, left.Width, left.Height
+        );
+    }
 }
 
 struct Image

@@ -397,6 +397,8 @@ partial class PropEditor : IEditorMode
 
         private readonly Vector2 origPA;
         private readonly Vector2 origPB;
+        
+        private readonly Vector2[] origSegments;
 
         public LongTransformMode(
             int handleId,
@@ -413,6 +415,10 @@ partial class PropEditor : IEditorMode
             {
                 origPA = rope.PointA;
                 origPB = rope.PointB;
+                origSegments = new Vector2[rope.Model!.SegmentCount];
+                for (int i = 0; i < rope.Model!.SegmentCount; i++) {
+                    origSegments[i] = rope.Model.GetSegmentPos(i);
+                }
             }
             else
             {
@@ -435,31 +441,63 @@ partial class PropEditor : IEditorMode
         {
             var pA = origPA;
             var pB = origPB;
-            Vector2 anchor;
+            Vector2 anchor = pB;
 
-            if (handleId == 0)
-            {
+            var segments = new Vector2[0];
+
+            var rope = prop.Rope;
+            if (rope is not null) {
+                segments = new Vector2[origSegments.Length];
+                for (int i = 0; i < origSegments.Length; i++) {
+                    segments[i] = origSegments[i];
+                }
+            }
+
+            if (handleId == 0) {
                 pA = Snap(mousePos, snap);
                 anchor = pB;
             }
-            else
-            {
+            else if (handleId == 1) {
                 pB = Snap(mousePos, snap);
                 anchor = pA;
+            }
+            else {
+                if (rope is not null) {
+                    segments[handleId - 2] = Snap(mousePos, snap);
+                    rope!.Model!.smooth = false;
+                }
             }
 
             // minimum size of 0.5 units
             {
                 var diff = pB - pA;
-                if (diff.LengthSquared() < 0.5f * 0.5f)
-                {
-                    if (handleId == 0)
-                    {
+                if (diff.LengthSquared() < 0.5f * 0.5f) {
+                    if (handleId == 0) {
                         pA = DirectionTo(anchor, pA) * 0.5f + anchor;
                     }
-                    else
-                    {
+                    else if (handleId == 1) {
                         pB = DirectionTo(anchor, pB) * 0.5f + anchor;
+                    }
+                }
+            }
+            
+            if (rope is not null) {
+                if (handleId > 1) {
+                    rope!.Model!.SetSegmentPosition(handleId - 2, segments[handleId - 2]);
+
+                    if (handleId == 2 && rope!.ReleaseMode != RopeReleaseMode.Left) {
+                        pA = rope!.Model!.GetSegmentPos(handleId - 2);
+                    }
+                    else if (handleId == segments.Length + 1 && rope!.ReleaseMode != RopeReleaseMode.Right) {
+                        pB = rope!.Model!.GetSegmentPos(handleId - 2);
+                    }
+                }
+                else {
+                    if (handleId == 0) {
+                        rope!.Model!.SetSegmentPosition(0, pA);
+                    }
+                    else if (handleId == 1) {
+                        rope!.Model!.SetSegmentPosition(segments.Length - 1, pB);
                     }
                 }
             }

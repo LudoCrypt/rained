@@ -278,79 +278,85 @@ class EditorGeometryRenderer
                     crackH = nLeft || nRight;
                     crackV = nUp || nDown;
                 }
+                
+                bool renderGeo = true;
+                if (c.HasTile() && RainEd.Instance.Preferences.ViewPreviews) {
+                    renderGeo = false;
+                }
 
                 switch (c.Geo)
                 {
                     case GeoType.Solid:
-                        if (hasCrack)
-                        {
-                            if (crackH && crackV)
+                        if (renderGeo) {
+                            if (hasCrack)
                             {
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, 4, 4, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize + 16, y * Level.TileSize, 4, 4, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize + 16, 4, 4, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize + 16, y * Level.TileSize + 16, 4, 4, Glib.Color.White);
+                                if (crackH && crackV)
+                                {
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, 4, 4, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize + 16, y * Level.TileSize, 4, 4, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize + 16, 4, 4, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize + 16, y * Level.TileSize + 16, 4, 4, Glib.Color.White);
+                                }
+                                else if (crackH)
+                                {
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, Level.TileSize, 4, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize + 16, Level.TileSize, 4, Glib.Color.White);
+                                }
+                                else if (crackV)
+                                {
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, 4, Level.TileSize, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize + 16, y * Level.TileSize, 4, Level.TileSize, Glib.Color.White);
+                                }
+                                else
+                                {
+                                    // draw negative diagonal line
+                                    output.DrawTriangle(
+                                        new Vector2(x, y) * Level.TileSize,
+                                        new Vector2(x * Level.TileSize, (y+1) * Level.TileSize - 2f),
+                                        new Vector2((x+1) * Level.TileSize - 2f, y * Level.TileSize),
+                                        Glib.Color.White
+                                    );
+                                    output.DrawTriangle(
+                                        new Vector2((x+1) * Level.TileSize, y * Level.TileSize + 2f),
+                                        new Vector2(x * Level.TileSize + 2f, (y+1) * Level.TileSize),
+                                        new Vector2(x+1, y+1) * Level.TileSize,
+                                        Glib.Color.White
+                                    );
+                                }
                             }
-                            else if (crackH)
+                            else if (viewBeams)
                             {
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, Level.TileSize, 4, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize + 16, Level.TileSize, 4, Glib.Color.White);
-                            }
-                            else if (crackV)
-                            {
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, 4, Level.TileSize, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize + 16, y * Level.TileSize, 4, Level.TileSize, Glib.Color.White);
+                                // extra logic to signify that there is a beam here
+                                // when beam is completely covered
+                                // this is done by not drawing on the space where there is a beam
+                                if (hasHBeam && hasVBeam)
+                                {
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, 8, 8, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize + 12, y * Level.TileSize, 8, 8, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize + 12, 8, 8, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize + 12, y * Level.TileSize + 12, 8, 8, Glib.Color.White);
+                                }
+                                else if (hasHBeam)
+                                {
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, Level.TileSize, 8, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize + 12, Level.TileSize, 8, Glib.Color.White);
+                                }
+                                else if (hasVBeam)
+                                {
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, 8, Level.TileSize, Glib.Color.White);
+                                    output.DrawRectangle(x * Level.TileSize + 12, y * Level.TileSize, 8, Level.TileSize, Glib.Color.White);
+                                }
+                                else
+                                {
+                                    output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, Level.TileSize, Level.TileSize, Glib.Color.White);
+                                }
                             }
                             else
                             {
-                                // draw negative diagonal line
-                                output.DrawTriangle(
-                                    new Vector2(x, y) * Level.TileSize,
-                                    new Vector2(x * Level.TileSize, (y+1) * Level.TileSize - 2f),
-                                    new Vector2((x+1) * Level.TileSize - 2f, y * Level.TileSize),
-                                    Glib.Color.White
-                                );
-                                output.DrawTriangle(
-                                    new Vector2((x+1) * Level.TileSize, y * Level.TileSize + 2f),
-                                    new Vector2(x * Level.TileSize + 2f, (y+1) * Level.TileSize),
-                                    new Vector2(x+1, y+1) * Level.TileSize,
-                                    Glib.Color.White
-                                );
-                            }
-                        }
-                        else if (viewBeams)
-                        {
-                            // extra logic to signify that there is a beam here
-                            // when beam is completely covered
-                            // this is done by not drawing on the space where there is a beam
-                            if (hasHBeam && hasVBeam)
-                            {
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, 8, 8, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize + 12, y * Level.TileSize, 8, 8, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize + 12, 8, 8, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize + 12, y * Level.TileSize + 12, 8, 8, Glib.Color.White);
-                            }
-                            else if (hasHBeam)
-                            {
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, Level.TileSize, 8, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize + 12, Level.TileSize, 8, Glib.Color.White);
-                            }
-                            else if (hasVBeam)
-                            {
-                                output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, 8, Level.TileSize, Glib.Color.White);
-                                output.DrawRectangle(x * Level.TileSize + 12, y * Level.TileSize, 8, Level.TileSize, Glib.Color.White);
-                            }
-                            else
-                            {
+                                // view obscured beams is off, draw as normal
                                 output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, Level.TileSize, Level.TileSize, Glib.Color.White);
                             }
                         }
-                        else
-                        {
-                            // view obscured beams is off, draw as normal
-                            output.DrawRectangle(x * Level.TileSize, y * Level.TileSize, Level.TileSize, Level.TileSize, Glib.Color.White);
-                        }
-
                         break;
                         
                     case GeoType.Platform:
@@ -370,6 +376,7 @@ class EditorGeometryRenderer
                         break;
 
                     case GeoType.SlopeLeftDown:
+                        if (renderGeo)
                         output.DrawTriangle(
                             new Vector2(x+1, y+1) * Level.TileSize,
                             new Vector2(x+1, y) * Level.TileSize,
@@ -379,6 +386,7 @@ class EditorGeometryRenderer
                         break;
 
                     case GeoType.SlopeLeftUp:
+                        if (renderGeo)
                         output.DrawTriangle(
                             new Vector2(x, y+1) * Level.TileSize,
                             new Vector2(x+1, y+1) * Level.TileSize,
@@ -388,6 +396,7 @@ class EditorGeometryRenderer
                         break;
 
                     case GeoType.SlopeRightDown:
+                        if (renderGeo)
                         output.DrawTriangle(
                             new Vector2(x+1, y) * Level.TileSize,
                             new Vector2(x, y) * Level.TileSize,
@@ -397,6 +406,7 @@ class EditorGeometryRenderer
                         break;
 
                     case GeoType.SlopeRightUp:
+                        if (renderGeo)
                         output.DrawTriangle(
                             new Vector2(x+1, y+1) * Level.TileSize,
                             new Vector2(x, y) * Level.TileSize,
@@ -406,7 +416,7 @@ class EditorGeometryRenderer
                         break;
                 }
 
-                if (c.Geo != GeoType.Solid)
+                if (c.Geo != GeoType.Solid || !renderGeo)
                 {
                     // draw horizontal beam
                     if (hasHBeam)

@@ -32,8 +32,10 @@ partial class TileEditor : IEditorMode
         var totalTileWidth = tile.Width + tile.BfTiles * 2;
         var totalTileHeight = tile.Height + tile.BfTiles * 2;
 
-        Raylib.BeginShaderMode(Shaders.TileShader);
-        Color drawCol = tile.Category.Color;
+        Raylib.BeginShaderMode(Shaders.PaletteShader);
+        RainEd.Instance.LevelView.Renderer.Palette.BeginPaletteShaderMode();
+        
+        Color drawCol = new Color((byte)0, (byte)0, (byte)0, (byte)255);
         var dstRec = new Rectangle(0, 0, totalTileWidth * 20, totalTileHeight * 20);
 
         // draw front of box tile
@@ -56,18 +58,8 @@ partial class TileEditor : IEditorMode
             {
                 var srcRec = Rendering.TileRenderer.GetGraphicSublayer(tile, l, 0);
 
-                float lf = (float)l / tile.LayerCount;
-
-                // fade to white as the layer is further away
-                // from the front
-                float a = lf;
-                var col = new Color
-                {
-                    R = (byte)(drawCol.R * (1f - a) + (drawCol.R * 0.5) * a),
-                    G = (byte)(drawCol.G * (1f - a) + (drawCol.G * 0.5) * a),
-                    B = (byte)(drawCol.B * (1f - a) + (drawCol.B * 0.5) * a),
-                    A = 255
-                };
+                var paletteIndex = tile.LayerDepths[l] / 30f;
+                var col = new Color((byte)Math.Clamp(paletteIndex * 255, 0, 255), (byte)0, (byte)0, (byte)255);
 
                 tileTexture.DrawRectangle(srcRec, dstRec, col);
             }

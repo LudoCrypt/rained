@@ -178,6 +178,7 @@ class UserPreferences
     public bool ViewTileSpecPreview { get; set; } = true;
     public bool ViewTileSpecsOnTooltip { get; set; } = true;
     public bool ViewNodeIndices { get; set; } = false;
+	public bool ViewTilePreviewOnCatalog { get; set; } = true;
     public NodeViewFilterData NodeViewFilter { get; set; } = new();
 
     public string GeometryViewMode { get; set; }

@@ -31,8 +31,9 @@ class RopeModel
     private Vector2 posA, posB;
     private int layer;
     private int release;
-    private RopePhysicalProperties physics;
+    public RopePhysicalProperties physics;
     private Segment[] segments;
+    public bool smooth = true;
 
     public RopeModel(
         Vector2 pA, Vector2 pB,
@@ -443,6 +444,9 @@ class RopeModel
         }
         else
         {
+            if (!smooth) {
+                return segments[A].pos;
+            }
             var smoothpos = (segments[A-1].pos + segments[A+1].pos) / 2f;
             return (segments[A].pos + smoothpos) / 2f;
         }
@@ -467,6 +471,9 @@ class RopeModel
         }
         else
         {
+            if (!smooth) {
+                return segments[A].pos;
+            }
             var smoothpos = (segments[A-1].lastPos + segments[A+1].lastPos) / 2f;
             return (segments[A].lastPos + smoothpos) / 2f;
         }

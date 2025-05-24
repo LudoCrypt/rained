@@ -173,11 +173,16 @@ class PropRope
     {
         // if rope properties changed, reset rope model
         if (model == null || Layer != model.Layer ||
-            lastPointA != PointA || lastPointB != PointB ||
             ReleaseMode != model.Release || Width != lastWidth
         )
         {
             ResetModel();
+        }
+        
+        if (lastPointA != PointA || lastPointB != PointB)
+        {
+            model!.PointA = PointA;
+            model!.PointB = PointB;
         }
 
         ignoreMovement = false;

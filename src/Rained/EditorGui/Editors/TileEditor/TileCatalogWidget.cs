@@ -81,6 +81,8 @@ class TileCatalogWidget(ITileSelectionState selectionState) : TileEditorCatalog
         var tileDb = RainEd.Instance.TileDatabase;
 
         var tileList = tileDb.Categories[state.SelectedTileGroup].Tiles;
+        
+        var prefs = RainEd.Instance.Preferences;
 
         for (int i = 0; i < tileList.Count; i++)
         {
@@ -90,39 +92,56 @@ class TileCatalogWidget(ITileSelectionState selectionState) : TileEditorCatalog
             if (!tile.Name.Contains(SearchQuery, StringComparison.CurrentCultureIgnoreCase))
                 continue;
             
-            if (ImGui.Selectable(tile.Name, tile == state.SelectedTile))
-            {
-                state.SelectTile(tile);
-            }
+            if (prefs.ViewTilePreviewOnCatalog) {
+                Vector2 imageSize = new Vector2(tile.Width, tile.Height) * 16;
+                
+                if (ImGui.Selectable("##" + tile.Name, tile == state.SelectedTile, ImGuiSelectableFlags.None, imageSize)) {
+                    state.SelectTile(tile);
+                }
+                
+                ImGui.SetCursorPos(ImGui.GetCursorPos() - new Vector2(0, imageSize.Y + 2));
+                RenderTileGuiPreview(tile);
 
-            if (ImGui.IsItemHovered())
-            {
-                var fgCol = Color.White;
-                var bgCol4 = ImGui.GetStyle().Colors[(int)ImGuiCol.PopupBg];
-                var bgCol = new Color(
-                    (byte)(bgCol4.X * 255f),
-                    (byte)(bgCol4.Y * 255f),
-                    (byte)(bgCol4.Z * 255f),
-                    (byte)(bgCol4.W * 255f)
-                );
-
-                var contrastRatio = ContrastRatio(fgCol, bgCol);
-                var invertContrast = contrastRatio < 3f;
-
-                if (invertContrast) {
-                    ImGui.PushStyleColor(ImGuiCol.PopupBg, new Vector4(
-                        1f - bgCol4.X,
-                        1f - bgCol4.Y,
-                        1f - bgCol4.Z,
-                        bgCol4.W
-                    ));
+                if (ImGui.IsItemHovered()) {
+                    ImGui.BeginTooltip();
+                    ImGui.Text(tile.Name);
+                    ImGui.EndTooltip();
+                }
+            } else {
+                if (ImGui.Selectable(tile.Name, tile == state.SelectedTile))
+                {
+                    state.SelectTile(tile);
                 }
 
-                ImGui.BeginTooltip();
-                RenderTilePreview(tile);
-                ImGui.EndTooltip();
+                if (ImGui.IsItemHovered())
+                {
+                    var fgCol = Color.White;
+                    var bgCol4 = ImGui.GetStyle().Colors[(int)ImGuiCol.PopupBg];
+                    var bgCol = new Color(
+                        (byte)(bgCol4.X * 255f),
+                        (byte)(bgCol4.Y * 255f),
+                        (byte)(bgCol4.Z * 255f),
+                        (byte)(bgCol4.W * 255f)
+                    );
 
-                if (invertContrast) ImGui.PopStyleColor();
+                    var contrastRatio = ContrastRatio(fgCol, bgCol);
+                    var invertContrast = contrastRatio < 3f;
+
+                    if (invertContrast) {
+                        ImGui.PushStyleColor(ImGuiCol.PopupBg, new Vector4(
+                            1f - bgCol4.X,
+                            1f - bgCol4.Y,
+                            1f - bgCol4.Z,
+                            bgCol4.W
+                        ));
+                    }
+
+                    ImGui.BeginTooltip();
+                    RenderTilePreview(tile);
+                    ImGui.EndTooltip();
+
+                    if (invertContrast) ImGui.PopStyleColor();
+                }
             }
         }
     }
@@ -135,8 +154,10 @@ class TileCatalogWidget(ITileSelectionState selectionState) : TileEditorCatalog
         var totalTileWidth = tile.Width + tile.BfTiles * 2;
         var totalTileHeight = tile.Height + tile.BfTiles * 2;
 
-        Raylib.BeginShaderMode(Shaders.TileShader);
-        Color drawCol = tile.Category.Color;
+        Raylib.BeginShaderMode(Shaders.PaletteShader);
+        RainEd.Instance.LevelView.Renderer.Palette.BeginPaletteShaderMode();
+        
+        Color drawCol = new Color((byte)0, (byte)0, (byte)0, (byte)255);
         var dstRec = new Rectangle(0, 0, totalTileWidth * 20, totalTileHeight * 20);
 
         // draw front of box tile
@@ -159,18 +180,8 @@ class TileCatalogWidget(ITileSelectionState selectionState) : TileEditorCatalog
             {
                 var srcRec = Rendering.TileRenderer.GetGraphicSublayer(tile, l, 0);
 
-                float lf = (float)l / tile.LayerCount;
-
-                // fade to white as the layer is further away
-                // from the front
-                float a = lf;
-                var col = new Color
-                {
-                    R = (byte)(drawCol.R * (1f - a) + (drawCol.R * 0.5) * a),
-                    G = (byte)(drawCol.G * (1f - a) + (drawCol.G * 0.5) * a),
-                    B = (byte)(drawCol.B * (1f - a) + (drawCol.B * 0.5) * a),
-                    A = 255
-                };
+                var paletteIndex = tile.LayerDepths[l] / 30f;
+                var col = new Color((byte)Math.Clamp(paletteIndex * 255, 0, 255), (byte)0, (byte)0, (byte)255);
 
                 tileTexture.DrawRectangle(srcRec, dstRec, col);
             }
@@ -295,6 +306,22 @@ class TileCatalogWidget(ITileSelectionState selectionState) : TileEditorCatalog
 
         // fallback case
         renderPlaceholder:
+        ImGuiExt.ImageSize(RainEd.Instance.PlaceholderTexture, 16, 16);
+    }
+    
+    public static void RenderTileGuiPreview(Tile tile) {
+        var previewTexFound = RainEd.Instance.AssetGraphics.GetTilePreviewTexture(tile, out var previewTexture, out var previewRect);
+        if (!previewTexFound || previewTexture is null || previewRect is null)
+            goto renderPlaceholder;
+
+        var previewWidth = previewRect.Value.Width;
+        float previewHeight = previewRect.Value.Height;
+
+        ImGuiExt.ImageRect(previewTexture!, previewWidth, previewHeight, previewRect.Value, tile.Category.Color);
+        return;
+
+    // fallback case
+    renderPlaceholder:
         ImGuiExt.ImageSize(RainEd.Instance.PlaceholderTexture, 16, 16);
     }
 
